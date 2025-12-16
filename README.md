@@ -86,7 +86,3 @@ The application is built on a robust **NoSQL** architecture with **10 Data Model
     ```
 
 ---
-
-<div align="center">
-  <sub>Built with ❤️ by Kadir Doğan</sub>
-</div>
