@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
+import 'services/map_state.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 
@@ -31,6 +32,7 @@ class EcoTrackApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService(isFirebaseInitialized: isFirebaseInitialized)),
+        ChangeNotifierProvider(create: (_) => MapState()),
       ],
       child: MaterialApp(
         title: 'EcoTrack',

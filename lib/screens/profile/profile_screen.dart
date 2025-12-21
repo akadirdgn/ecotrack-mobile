@@ -1,6 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Badge;
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
+import '../../services/gamification_service.dart'; // New Import
+import '../../services/social_service.dart'; // New Import
+import '../../models/models.dart'; // For Badge model
 import 'settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -67,31 +70,120 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Badge Display (New Requirement)
-                  // if (user.activityCount >= 10)
-                     Container(
-                       margin: const EdgeInsets.only(top: 16),
-                       padding: const EdgeInsets.all(12),
-                       decoration: BoxDecoration(
-                         color: Colors.white.withOpacity(0.1),
-                         borderRadius: BorderRadius.circular(12),
-                         border: Border.all(
-                            color: _getBadgeColor(user.activityCount).withOpacity(0.5),
-                            width: 2
-                         )
-                       ),
-                       child: Row(
-                         mainAxisAlignment: MainAxisAlignment.center,
-                         children: [
-                           Icon(Icons.military_tech, color: _getBadgeColor(user.activityCount), size: 32),
-                           const SizedBox(width: 12),
-                           Text(
-                             "${_getBadgeName(user.activityCount)} Rozeti Sahibi",
-                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                           )
-                         ],
-                       ),
-                     ),
+                  // Gamification Badges Section
+                  Text("Rozetlerim", style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  
+                  FutureBuilder<List<Badge>>(
+                    future: GamificationService().getBadges(), // Using the service
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                      
+                      final badges = snapshot.data!;
+                      return SizedBox(
+                        height: 140, // Height for the horizontal list
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: badges.length,
+                          itemBuilder: (context, index) {
+                            final badge = badges[index];
+                            // Logic to determine if user earned it (Mock logic for UI demo based on points)
+                            final bool isEarned = user.totalPoints >= badge.requiredPoints;
+                            
+                            return Opacity(
+                              opacity: isEarned ? 1.0 : 0.5, // Dim if not earned
+                              child: Container(
+                                width: 100,
+                                margin: const EdgeInsets.only(right: 12),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isEarned ? Colors.amber.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: isEarned ? Border.all(color: Colors.amber, width: 1) : null,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    // Use NetworkImage for URL, formatted properly
+                                    Image.network(
+                                      badge.imageUrl,
+                                      height: 50,
+                                      width: 50,
+                                      errorBuilder: (c,e,s) => Icon(Icons.military_tech, size: 50, color: isEarned ? Colors.amber : Colors.grey),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      badge.name,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
+                                      maxLines: 2,
+                                    ),
+                                    if (!isEarned)
+                                      Text(
+                                        "${badge.requiredPoints}P",
+                                        style: const TextStyle(fontSize: 10, color: Colors.white54),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Groups Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("Topluluklar", style: Theme.of(context).textTheme.titleLarge), // Changed title
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline, color: Colors.greenAccent),
+                        onPressed: () => _showCreateGroupDialog(context, user.uid),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  FutureBuilder<List<Group>>(
+                    future: SocialService().getGroups(), 
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox.shrink();
+                      final groups = snapshot.data!;
+                      
+                      return Column(
+                        children: groups.map((group) {
+                          final isMember = group.memberIds.contains(user.uid);
+                          return Card(
+                            color: Colors.white.withOpacity(0.05),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: CircleAvatar(backgroundColor: Colors.indigo, child: Text(group.name[0], style: const TextStyle(color: Colors.white))),
+                              title: Text(group.name, style: const TextStyle(color: Colors.white)),
+                              subtitle: Text("${group.totalPoints} Puan • ${group.memberIds.length} Üye", style: const TextStyle(color: Colors.white70)),
+                              trailing: isMember 
+                                ? const Icon(Icons.check_circle, color: Colors.green)
+                                : ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blueAccent,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size(60, 30),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    ),
+                                    onPressed: () async {
+                                      await SocialService().joinGroup(group.id, user.uid);
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Gruba katıldınız!")));
+                                      (context as Element).markNeedsBuild(); // Force rebuild to update UI
+                                    }, 
+                                    child: const Text("Katıl", style: TextStyle(fontSize: 12)),
+                                  ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    }
+                  ),
                   const SizedBox(height: 24),
                   
                   Text("Etki İstatistikleri", style: Theme.of(context).textTheme.titleLarge),
@@ -177,5 +269,58 @@ class ProfileScreen extends StatelessWidget {
     if (count >= 50) return Colors.amber; // Gold
     if (count >= 10) return Colors.grey.shade400; // Silver
     return Colors.brown.shade400; // Bronze
+  }
+
+  void _showCreateGroupDialog(BuildContext context, String userId) {
+    final nameController = TextEditingController();
+    final descController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text("Yeni Grup Oluştur", style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: "Grup Adı",
+                labelStyle: TextStyle(color: Colors.white70),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24))
+              ),
+            ),
+            const SizedBox(height: 8),
+             TextField(
+              controller: descController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: "Açıklama",
+                labelStyle: TextStyle(color: Colors.white70),
+                 enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24))
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("İptal", style: TextStyle(color: Colors.grey))),
+          TextButton(
+            onPressed: () async {
+              if (nameController.text.isNotEmpty) {
+                await SocialService().createGroup(nameController.text, descController.text, userId);
+                Navigator.pop(context);
+                // In a stateless widget, we can't easily setState to refresh the FutureBuilder parent.
+                // For this demo, we rely on the fact that next time profile opens it will be there, 
+                // or user can pull to refresh if we had one.
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Grup oluşturuldu!")));
+              }
+            },
+            child: const Text("Oluştur", style: TextStyle(color: Colors.greenAccent))
+          ),
+        ],
+      )
+    );
   }
 }

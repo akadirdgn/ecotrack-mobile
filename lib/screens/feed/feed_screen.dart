@@ -5,9 +5,13 @@ import 'dart:convert'; // For Base64
 import 'package:provider/provider.dart'; // Added missing Provider import
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/gamification_service.dart'; // Import
+import '../../services/content_service.dart'; // New Import
+import '../../services/map_state.dart';
+import 'package:latlong2/latlong.dart';
 import '../../models/models.dart';
 
- class FeedScreen extends StatelessWidget {
+class FeedScreen extends StatelessWidget {
   const FeedScreen({super.key});
 
   @override
@@ -26,31 +30,198 @@ import '../../models/models.dart';
           return Center(child: Text("Hata: ${snapshot.error}"));
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Text(
-              "Henüz hiç aktivite yok. \nİlk paylaşımı sen yap!",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70),
-            ),
-          );
-        }
-
-        final docs = snapshot.data!.docs;
+        final docs = snapshot.data?.docs ?? [];
         final activities = docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          // Ensure ID is passed if not in data
           data['id'] = doc.id; 
           return Activity.fromMap(data);
         }).toList();
 
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 80), // Space for FAB
-          itemCount: activities.length,
+          // Item count + 2 for Tip Card (0) and Challenges (1)
+          itemCount: activities.length + 2,
           itemBuilder: (context, index) {
-            final activity = activities[index];
+            // Index 0 is the Tip Card
+            if (index == 0) {
+              return const _DailyTipSection();
+            }
+
+            // Index 1 is the Challenges Section
+            if (index == 1) {
+              return const _ChallengesSection();
+            }
+            
+            // Adjust index for activities (subtract 2)
+            final activity = activities[index - 2];
             return ActivityCard(activity: activity);
           },
+        );
+      },
+    );
+  }
+}
+
+class _DailyTipSection extends StatelessWidget {
+  const _DailyTipSection();
+
+  @override
+  Widget build(BuildContext context) {
+    // We can use FutureBuilder for one-time fetch or Stream if needed
+    // Importing service dynamically or assuming it's available
+    // For now, I'll instantiate usage here.
+    // Ideally use Provider for Service injection.
+    
+    // START: Quick fix to import service without changing imports at top file level if risky, 
+    // but better to add import. I will assume import is added or add it below in a new replace block if needed.
+    // Actually, I'll need to add the import to 'package:ecotrack/services/content_service.dart'
+    
+    return FutureBuilder<List<Tip>>(
+      future: ContentService().getDailyTips(), // Assumes ContentService is imported
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+        
+        final tip = snapshot.data!.first; // Show newest tip
+        
+        return Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.teal.shade700, Colors.teal.shade900],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.teal.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              )
+            ]
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                   const Icon(Icons.lightbulb, color: Colors.amber, size: 20),
+                   const SizedBox(width: 8),
+                   Text("Günün İpucu", style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(tip.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 4),
+              Text(tip.content, style: const TextStyle(color: Colors.white70)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ChallengesSection extends StatefulWidget {
+  const _ChallengesSection();
+
+  @override
+  State<_ChallengesSection> createState() => _ChallengesSectionState();
+}
+
+class _ChallengesSectionState extends State<_ChallengesSection> {
+  // Simple hack to refresh state after join, better with Provider/Bloc
+  void _refresh() {
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false); // Need userId
+    final userId = authService.user?.uid;
+
+    return FutureBuilder<List<Challenge>>(
+      future: GamificationService().getActiveChallenges(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+
+        final challenges = snapshot.data!;
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text("Meydan Okumalar 🔥", style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white)),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 140,
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                scrollDirection: Axis.horizontal,
+                itemCount: challenges.length,
+                itemBuilder: (context, index) {
+                  final challenge = challenges[index];
+                  final daysLeft = challenge.endDate.difference(DateTime.now()).inDays;
+                  final isJoined = userId != null && challenge.participants.contains(userId);
+
+                  return Container(
+                    width: 240,
+                    margin: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isJoined ? Colors.amber.withOpacity(0.5) : Colors.white12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.flash_on, color: isJoined ? Colors.amber : Colors.grey, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(challenge.title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(challenge.description, style: const TextStyle(color: Colors.white70, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        const Spacer(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("$daysLeft gün kaldı", style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
+                            isJoined 
+                            ? Container(
+                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                               decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), borderRadius: BorderRadius.circular(8)),
+                               child: const Text("Katıldın", style: TextStyle(color: Colors.amber, fontSize: 12)),
+                            )
+                            : InkWell(
+                                onTap: () async {
+                                  if (userId == null) return;
+                                  await GamificationService().joinChallenge(challenge.id, userId);
+                                  _refresh(); // Rebuild to show "Katıldın"
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Meydan okumaya katıldın!")));
+                                },
+                                child: Container(
+                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                   decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                                   child: const Text("Katıl", style: TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                            )
+                          ],
+                        )
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
         );
       },
     );
@@ -124,15 +295,23 @@ class ActivityCard extends StatelessWidget {
                 // Location Info (New)
                 if (activity.latitude != null && activity.longitude != null) ...[
                    const SizedBox(height: 8),
-                   Row(
-                     children: [
-                       const Icon(Icons.location_on, color: Colors.blueAccent, size: 16),
-                       const SizedBox(width: 4),
-                       Text(
-                         "Konum: ${activity.latitude!.toStringAsFixed(4)}, ${activity.longitude!.toStringAsFixed(4)}",
-                         style: const TextStyle(color: Colors.blueAccent, fontSize: 12),
-                       ),
-                     ],
+                   InkWell(
+                     onTap: () {
+                        // Navigate to Map
+                        Provider.of<MapState>(context, listen: false).navigateToLocation(
+                          LatLng(activity.latitude!, activity.longitude!)
+                        );
+                     },
+                     child: Row(
+                       children: [
+                         const Icon(Icons.location_on, color: Colors.blueAccent, size: 16),
+                         const SizedBox(width: 4),
+                         Text(
+                           "Konum: ${activity.latitude!.toStringAsFixed(4)}, ${activity.longitude!.toStringAsFixed(4)}",
+                           style: const TextStyle(color: Colors.blueAccent, fontSize: 12, decoration: TextDecoration.underline),
+                         ),
+                       ],
+                     ),
                    )
                 ],
 

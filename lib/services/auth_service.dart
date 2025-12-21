@@ -91,6 +91,10 @@ class AuthService extends ChangeNotifier {
           totalPoints: 0,
         );
         await _firestore!.collection('users').doc(cred.user!.uid).set(newUser.toMap());
+        
+        // Send Welcome Notification
+        await _sendWelcomeNotification(cred.user!.uid, displayName);
+        
         await _fetchUserDetails(cred.user!.uid);
       }
       return null;
@@ -132,6 +136,22 @@ class AuthService extends ChangeNotifier {
       return _getTurkishError(e.code);
     } catch (e) {
       return 'Bir hata oluştu.';
+    }
+  }
+
+  Future<void> _sendWelcomeNotification(String userId, String userName) async {
+    try {
+      if (_firestore == null) return;
+      await _firestore!.collection('notifications').add({
+        'userId': userId,
+        'title': 'Aramıza Hoşgeldin $userName! 🌱',
+        'body': 'EcoTrack ailesine katıldığın için teşekkürler. İlk görevini tamamlamak için Feed sayfasına göz at!',
+        'type': 'welcome',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print("Welcome notification error: $e");
     }
   }
 

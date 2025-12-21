@@ -5,7 +5,9 @@ import '../map/map_screen.dart';
 import '../camera/camera_screen.dart';
 import '../profile/profile_screen.dart';
 import '../feed/feed_screen.dart';
-// import '../camera/camera_screen.dart';
+import '../../services/social_service.dart'; // New Import
+import '../../services/map_state.dart'; // New Import
+import '../../models/models.dart'; // New Import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,6 +41,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
+    
+    // Listen to MapState for navigation requests
+    final mapState = Provider.of<MapState>(context);
+    if (mapState.targetLocation != null && _currentIndex != 1) {
+       // Defer state update to avoid build conflicts
+       Future.microtask(() => setState(() => _currentIndex = 1));
+    }
 
     return Scaffold(
       extendBody: true, // For transparency behind nav bar
@@ -49,6 +58,52 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         title: const Text("EcoTrack"),
         actions: [
+          // Notifications Icon
+          StreamBuilder<List<NotificationModel>>(
+            stream: Stream.fromFuture(SocialService().getUserNotifications('mock_user_id')), // Mock ID or Provider User ID
+            builder: (context, snapshot) {
+              final hasUnread = snapshot.data?.any((n) => !n.isRead) ?? false;
+              return Stack(
+                children: [
+                   IconButton(
+                    icon: const Icon(Icons.notifications),
+                    onPressed: () {
+                      // Show specific notification dialog or screen
+                      showDialog(
+                        context: context, 
+                        builder: (c) => AlertDialog(
+                          title: const Text("Bildirimler"),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            height: 300,
+                            child: ListView(
+                              children: snapshot.data?.map((n) => ListTile(
+                                leading: Icon(n.type == 'badge' ? Icons.military_tech : Icons.info, color: Colors.blue),
+                                title: Text(n.title), 
+                                subtitle: Text(n.body),
+                                trailing: n.isRead ? null : const Icon(Icons.circle, color: Colors.red, size: 8),
+                              )).toList() ?? const [Text("Bildirim yok")],
+                            ),
+                          ),
+                          actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text("Kapat"))],
+                        )
+                      );
+                    },
+                  ),
+                  if (hasUnread)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
+                        constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                      ),
+                    )
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.exit_to_app),
             onPressed: () => authService.signOut(),

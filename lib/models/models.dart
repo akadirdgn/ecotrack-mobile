@@ -1,3 +1,7 @@
+export 'gamification_models.dart';
+export 'social_models.dart';
+export 'content_models.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // 1. Users Table
@@ -103,9 +107,6 @@ class ActivityLocation {
   final String address;
 
   ActivityLocation({required this.id, required this.latitude, required this.longitude, required this.address});
-  
-  // Helper for maps
-  // LatLng get toLatLng => LatLng(latitude, longitude); 
 }
 
 // 5. Photos Table
@@ -118,16 +119,7 @@ class Photo {
   Photo({required this.id, required this.storageUrl, required this.takenAt, required this.metadata});
 }
 
-// 6. Badges Table
-class Badge {
-  final String id;
-  final String name;
-  final String description;
-  final String imageUrl;
-  final String criteria;
-
-  Badge({required this.id, required this.name, required this.description, required this.imageUrl, required this.criteria});
-}
+// Removed Badge class - now imported from gamification_models.dart
 
 // 7. UserBadges Table (Join)
 class UserBadge {

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
+import 'gamification_service.dart'; // Import
 
 class ActivityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -65,12 +66,21 @@ class ActivityService {
            updateData['treesPlanted'] = FieldValue.increment(amount.toInt());
            updateData['co2Saved'] = FieldValue.increment(amount * 10.0);
         }
-        else if (typeId == 'glass') {
+        if (typeId == 'glass') {
            updateData['co2Saved'] = FieldValue.increment(amount * 0.5);
         }
 
         transaction.update(userDoc, updateData);
       });
+      
+      // Post-transaction: Check for new badges
+      // Fetch updated user points to be sure, or calculate locally.
+      DocumentSnapshot userSnap = await _usersRef.doc(userId).get();
+      if (userSnap.exists) {
+        int currentPoints = (userSnap.data() as Map<String, dynamic>)['totalPoints'] ?? 0;
+        await GamificationService().checkAndAssignBadges(userId, currentPoints);
+      }
+
       print("Activity Added and Points Updated");
     } catch (e) {
       print("Error adding activity: $e");
@@ -131,5 +141,16 @@ class ActivityService {
                 createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
               );
             }).toList());
+  }
+
+  
+  // Connect to Gamification Logic
+  Future<void> _checkGamification(String userId, int newTotalPoints) async {
+    // We import the service dynamically or pass it to avoid circular deps if needed, 
+    // but here direct usage is fine as they are effectively separate modules for now.
+    // However, to keep it clean, let's just use the GamificationService class.
+    // Note: Verify imports in file header.
+    // Simple fire and forget or await.
+    // We need to import it.
   }
 }
