@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart' hide Badge;
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
-import '../../services/gamification_service.dart'; // New Import
-import '../../services/social_service.dart'; // New Import
-import '../../models/models.dart'; // For Badge model
+import '../../services/social_service.dart';
+import '../../services/gamification_service.dart';
+import '../../models/user_model.dart';
+import '../../models/badge_model.dart';
+import '../../models/group_model.dart';
+import '../../models/activity_model.dart';
 import 'settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -70,67 +73,56 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Gamification Badges Section
+
+
+                  // Dynamic Badges Section
                   Text("Rozetlerim", style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 12),
-                  
-                  FutureBuilder<List<Badge>>(
-                    future: GamificationService().getBadges(), // Using the service
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                      
-                      final badges = snapshot.data!;
-                      return SizedBox(
-                        height: 140, // Height for the horizontal list
-                        child: ListView.builder(
+                  SizedBox(
+                    height: 140,
+                    child: FutureBuilder<List<BadgeModel>>(
+                      future: GamificationService().getAllBadges(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        final allBadges = snapshot.data!;
+
+                        if (allBadges.isEmpty) {
+                          return Container(
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white12,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              "Henüz rozet yok.",
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
                           scrollDirection: Axis.horizontal,
-                          itemCount: badges.length,
+                          itemCount: allBadges.length,
                           itemBuilder: (context, index) {
-                            final badge = badges[index];
-                            // Logic to determine if user earned it (Mock logic for UI demo based on points)
-                            final bool isEarned = user.totalPoints >= badge.requiredPoints;
-                            
-                            return Opacity(
-                              opacity: isEarned ? 1.0 : 0.5, // Dim if not earned
-                              child: Container(
-                                width: 100,
-                                margin: const EdgeInsets.only(right: 12),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: isEarned ? Colors.amber.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: isEarned ? Border.all(color: Colors.amber, width: 1) : null,
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    // Use NetworkImage for URL, formatted properly
-                                    Image.network(
-                                      badge.imageUrl,
-                                      height: 50,
-                                      width: 50,
-                                      errorBuilder: (c,e,s) => Icon(Icons.military_tech, size: 50, color: isEarned ? Colors.amber : Colors.grey),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      badge.name,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
-                                      maxLines: 2,
-                                    ),
-                                    if (!isEarned)
-                                      Text(
-                                        "${badge.requiredPoints}P",
-                                        style: const TextStyle(fontSize: 10, color: Colors.white54),
-                                      ),
-                                  ],
-                                ),
-                              ),
+                            final badge = allBadges[index];
+                            // Check if earned based on points
+                            final isEarned = user.totalPoints >= badge.requiredPoints;
+
+                            return _buildDynamicBadgeItem(
+                              badge.name,
+                              badge.iconUrl,
+                              badge.requiredPoints,
+                              isEarned,
+                              badge.category,
                             );
                           },
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 24),
 
@@ -138,7 +130,7 @@ class ProfileScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("Topluluklar", style: Theme.of(context).textTheme.titleLarge), // Changed title
+                      Text("Topluluklar", style: Theme.of(context).textTheme.titleLarge), 
                       IconButton(
                         icon: const Icon(Icons.add_circle_outline, color: Colors.greenAccent),
                         onPressed: () => _showCreateGroupDialog(context, user.uid),
@@ -211,8 +203,6 @@ class ProfileScreen extends StatelessWidget {
                     leading: const Icon(Icons.logout, color: Colors.redAccent),
                     title: const Text("Çıkış Yap", style: TextStyle(color: Colors.redAccent)),
                     onTap: () async {
-                      // Fix for infinite loading loop
-                      // Pop the profile screen FIRST, then sign out
                       Navigator.pop(context); 
                       await authService.signOut();
                     },
@@ -222,6 +212,132 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDynamicBadgeItem(String name, String iconUrl, int points, bool earned, String category) {
+    // Dynamic colors based on category
+    Color badgeColor;
+    switch (category) {
+      case 'milestone':
+        badgeColor = Colors.amber;
+        break;
+      case 'activity':
+        badgeColor = Colors.lightGreenAccent;
+        break;
+      case 'special':
+        badgeColor = Colors.purpleAccent;
+        break;
+      default:
+        badgeColor = Colors.cyanAccent;
+    }
+
+    return Opacity(
+      opacity: earned ? 1.0 : 0.35,
+      child: Container(
+        width: 100,
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: earned
+              ? LinearGradient(
+                  colors: [
+                    badgeColor.withOpacity(0.2),
+                    badgeColor.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: earned ? null : Colors.grey.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: earned ? Border.all(color: badgeColor, width: 2) : Border.all(color: Colors.white12, width: 1),
+          boxShadow: earned
+              ? [
+                  BoxShadow(
+                    color: badgeColor.withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              height: 48,
+              width: 48,
+              child: Image.network(
+                iconUrl,
+                errorBuilder: (c, e, s) => Icon(
+                  Icons.workspace_premium,
+                  size: 40,
+                  color: earned ? badgeColor : Colors.grey,
+                ),
+                color: earned ? null : Colors.grey,
+                colorBlendMode: earned ? null : BlendMode.saturation,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: earned ? badgeColor : Colors.white60,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (!earned)
+              Text(
+                "${points}P",
+                style: const TextStyle(fontSize: 10, color: Colors.white38),
+              )
+            else
+              Icon(Icons.check_circle, color: badgeColor, size: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
+  // Deprecated: Keeping for reference if old code calls it, but mostly replaced
+  Widget _buildBadgeItem(String name, int points, bool earned, IconData icon, Color badgeColor) {
+    return Opacity(
+      opacity: earned ? 1.0 : 0.5,
+      child: Container(
+        width: 100,
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: earned ? badgeColor.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: earned ? Border.all(color: badgeColor, width: 1) : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 40, color: earned ? badgeColor : Colors.grey),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
+              maxLines: 2,
+            ),
+            if (!earned)
+              Text(
+                "${points}P",
+                style: const TextStyle(fontSize: 10, color: Colors.white54),
+              ),
+          ],
+        ),
       ),
     );
   }

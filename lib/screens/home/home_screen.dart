@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../map/map_screen.dart';
 import '../camera/camera_screen.dart';
 import '../profile/profile_screen.dart';
 import '../feed/feed_screen.dart';
 import '../../services/social_service.dart'; // New Import
 import '../../services/map_state.dart'; // New Import
-import '../../models/models.dart'; // New Import
+import '../../models/user_model.dart';
+import '../../models/activity_model.dart';
+import '../../models/notification_model.dart';
+import '../../models/challenge_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -59,48 +63,117 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text("EcoTrack"),
         actions: [
           // Notifications Icon
-          StreamBuilder<List<NotificationModel>>(
-            stream: Stream.fromFuture(SocialService().getUserNotifications('mock_user_id')), // Mock ID or Provider User ID
-            builder: (context, snapshot) {
-              final hasUnread = snapshot.data?.any((n) => !n.isRead) ?? false;
-              return Stack(
-                children: [
-                   IconButton(
-                    icon: const Icon(Icons.notifications),
-                    onPressed: () {
-                      // Show specific notification dialog or screen
-                      showDialog(
-                        context: context, 
-                        builder: (c) => AlertDialog(
-                          title: const Text("Bildirimler"),
-                          content: SizedBox(
-                            width: double.maxFinite,
-                            height: 300,
-                            child: ListView(
-                              children: snapshot.data?.map((n) => ListTile(
-                                leading: Icon(n.type == 'badge' ? Icons.military_tech : Icons.info, color: Colors.blue),
-                                title: Text(n.title), 
-                                subtitle: Text(n.body),
-                                trailing: n.isRead ? null : const Icon(Icons.circle, color: Colors.red, size: 8),
-                              )).toList() ?? const [Text("Bildirim yok")],
+          Consumer<AuthService>(
+            builder: (context, authService, _) {
+              final userId = authService.user?.uid ?? '';
+              if (userId.isEmpty) return const SizedBox();
+
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('notifications')
+                    .where('userId', isEqualTo: userId)
+                    .orderBy('createdAt', descending: true)
+                    .limit(20)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return IconButton(
+                      icon: const Icon(Icons.notifications),
+                      onPressed: () {},
+                    );
+                  }
+
+                  final notifications = snapshot.data!.docs
+                      .map((doc) => NotificationModel.fromMap(doc.data() as Map<String, dynamic>))
+                      .toList();
+                  final hasUnread = notifications.any((n) => !n.isRead);
+
+                  return Stack(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.notifications),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (c) => AlertDialog(
+                              title: const Text("Bildirimler"),
+                              content: SizedBox(
+                                width: double.maxFinite,
+                                height: 400,
+                                child: notifications.isEmpty
+                                    ? const Center(child: Text("Henüz bildirim yok"))
+                                    : ListView.separated(
+                                        itemCount: notifications.length,
+                                        separatorBuilder: (_, __) => const Divider(),
+                                        itemBuilder: (context, index) {
+                                          final notif = notifications[index];
+                                          IconData icon;
+                                          Color color;
+
+                                          switch (notif.type) {
+                                            case 'welcome':
+                                              icon = Icons.celebration;
+                                              color = Colors.green;
+                                              break;
+                                            case 'badge_earned':
+                                              icon = Icons.workspace_premium;
+                                              color = Colors.amber;
+                                              break;
+                                            case 'milestone':
+                                              icon = Icons.star;
+                                              color = Colors.yellow;
+                                              break;
+                                            case 'challenge_completed':
+                                              icon = Icons.local_fire_department;
+                                              color = Colors.orange;
+                                              break;
+                                            default:
+                                              icon = Icons.notifications;
+                                              color = Colors.blue;
+                                          }
+
+                                          return ListTile(
+                                            leading: Icon(icon, color: color),
+                                            title: Text(
+                                              notif.title,
+                                              style: TextStyle(
+                                                fontWeight: notif.isRead ? FontWeight.normal : FontWeight.bold,
+                                              ),
+                                            ),
+                                            subtitle: Text(notif.body),
+                                            trailing: notif.isRead
+                                                ? null
+                                                : const Icon(Icons.circle, color: Colors.red, size: 8),
+                                          );
+                                        },
+                                      ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(c),
+                                  child: const Text("Kapat"),
+                                )
+                              ],
                             ),
-                          ),
-                          actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text("Kapat"))],
-                        )
-                      );
-                    },
-                  ),
-                  if (hasUnread)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
-                        constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                          );
+                        },
                       ),
-                    )
-                ],
+                      if (hasUnread)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               );
             },
           ),

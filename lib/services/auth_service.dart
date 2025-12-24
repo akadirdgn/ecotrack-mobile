@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/models.dart';
+import '../models/user_model.dart';
+import 'notification_service.dart';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth? _auth; // Nullable
@@ -83,6 +84,10 @@ class AuthService extends ChangeNotifier {
     try {
       UserCredential cred = await _auth!.createUserWithEmailAndPassword(email: email, password: password);
       if (cred.user != null) {
+        // Check if user document already exists (shouldn't happen, but prevents duplicate notifications)
+        final userDoc = await _firestore!.collection('users').doc(cred.user!.uid).get();
+        final isNewUser = !userDoc.exists;
+
         // Create user record in Firestore
         UserModel newUser = UserModel(
           uid: cred.user!.uid,
@@ -92,8 +97,10 @@ class AuthService extends ChangeNotifier {
         );
         await _firestore!.collection('users').doc(cred.user!.uid).set(newUser.toMap());
         
-        // Send Welcome Notification
-        await _sendWelcomeNotification(cred.user!.uid, displayName);
+        // Send Welcome Notification ONLY for new users 🎉
+        if (isNewUser) {
+          await NotificationService().sendWelcomeNotification(cred.user!.uid, displayName);
+        }
         
         await _fetchUserDetails(cred.user!.uid);
       }

@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
-import '../models/models.dart';
+import '../models/group_model.dart';
+import '../models/notification_model.dart';
+// Note: Report and Badge models were removed as requested.
 
 class SocialService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -95,26 +97,5 @@ class SocialService {
 
   // --- Reporting ---
 
-  Future<void> reportContent({
-    required String targetId,
-    required String targetType, // 'activity', 'comment'
-    required String reporterId,
-    required String reason,
-  }) async {
-    final String id = _uuid.v4();
-    final report = Report(
-      id: id,
-      targetId: targetId,
-      targetType: targetType,
-      reporterId: reporterId,
-      reason: reason,
-      status: 'pending',
-      createdAt: DateTime.now(),
-    );
-    // Note: We use toMap() but handle DateTime inside it
-    await _firestore.collection('reports').doc(id).set({
-      ...report.toMap(),
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
+
 }

@@ -15,19 +15,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  // Email validation regex
+  bool _isValidEmail(String email) {
+    // RFC 5322 compliant regex (simplified)
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
+    return emailRegex.hasMatch(email);
+  }
+
+  // Password validation
+  String? _validatePassword(String password) {
+    if (password.length < 6) {
+      return "Şifre en az 6 karakter olmalı";
+    }
+    return null;
+  }
+
   void _register() async {
-    if (_nameController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen tüm alanları doldurun.")));
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    // Validate name
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen adınızı yazın")),
+      );
+      return;
+    }
+
+    // Validate email
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen email adresinizi yazın")),
+      );
+      return;
+    }
+
+    if (!_isValidEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Geçersiz email formatı. Örnek: kullanici@gmail.com")),
+      );
+      return;
+    }
+
+    // Validate password
+    final passwordError = _validatePassword(password);
+    if (passwordError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(passwordError)),
+      );
       return;
     }
 
     setState(() => _isLoading = true);
     final authService = Provider.of<AuthService>(context, listen: false);
-    String? error = await authService.signUp(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-      _nameController.text.trim(),
-    );
+    String? error = await authService.signUp(email, password, name);
     setState(() => _isLoading = false);
 
     if (error != null) {

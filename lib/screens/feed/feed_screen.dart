@@ -1,15 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:convert'; // For Base64
-import 'package:provider/provider.dart'; // Added missing Provider import
+import 'dart:convert';
+import 'package:provider/provider.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
-import '../../services/gamification_service.dart'; // Import
-import '../../services/content_service.dart'; // New Import
+import '../../services/gamification_service.dart';
+import '../../services/social_service.dart';
 import '../../services/map_state.dart';
 import 'package:latlong2/latlong.dart';
-import '../../models/models.dart';
+import '../../models/activity_model.dart';
+import '../../models/comment_model.dart';
+import '../../models/challenge_model.dart';
+import '../../models/user_model.dart';
+import '../../models/tip_model.dart';
 
 class FeedScreen extends StatelessWidget {
   const FeedScreen({super.key});
@@ -38,21 +42,19 @@ class FeedScreen extends StatelessWidget {
         }).toList();
 
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 80), // Space for FAB
-          // Item count + 2 for Tip Card (0) and Challenges (1)
-          itemCount: activities.length + 2,
+          padding: const EdgeInsets.only(bottom: 80), 
+          itemCount: activities.length + 2, // Added +1 for Tip
           itemBuilder: (context, index) {
-            // Index 0 is the Tip Card
+            // Index 0: Daily Tip (Static)
             if (index == 0) {
               return const _DailyTipSection();
             }
 
-            // Index 1 is the Challenges Section
+            // Index 1: Challenges
             if (index == 1) {
               return const _ChallengesSection();
             }
             
-            // Adjust index for activities (subtract 2)
             final activity = activities[index - 2];
             return ActivityCard(activity: activity);
           },
@@ -62,27 +64,37 @@ class FeedScreen extends StatelessWidget {
   }
 }
 
+
 class _DailyTipSection extends StatelessWidget {
   const _DailyTipSection();
 
+  Future<TipModel?> _getTodaysTip() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('tips')
+          .where('isActive', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) return null;
+      return TipModel.fromMap(snapshot.docs.first.data());
+    } catch (e) {
+      print('Error fetching tip: $e');
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // We can use FutureBuilder for one-time fetch or Stream if needed
-    // Importing service dynamically or assuming it's available
-    // For now, I'll instantiate usage here.
-    // Ideally use Provider for Service injection.
-    
-    // START: Quick fix to import service without changing imports at top file level if risky, 
-    // but better to add import. I will assume import is added or add it below in a new replace block if needed.
-    // Actually, I'll need to add the import to 'package:ecotrack/services/content_service.dart'
-    
-    return FutureBuilder<List<Tip>>(
-      future: ContentService().getDailyTips(), // Assumes ContentService is imported
+    return FutureBuilder<TipModel?>(
+      future: _getTodaysTip(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
-        
-        final tip = snapshot.data!.first; // Show newest tip
-        
+        if (!snapshot.hasData || snapshot.data == null) {
+          return const SizedBox(); // Tip yoksa gösterme
+        }
+
+        final tip = snapshot.data!;
+
         return Container(
           margin: const EdgeInsets.all(16),
           padding: const EdgeInsets.all(16),
@@ -106,9 +118,9 @@ class _DailyTipSection extends StatelessWidget {
             children: [
               Row(
                 children: [
-                   const Icon(Icons.lightbulb, color: Colors.amber, size: 20),
-                   const SizedBox(width: 8),
-                   Text("Günün İpucu", style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text(tip.iconEmoji, style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 8),
+                  Text("Günün İpucu", style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -122,6 +134,8 @@ class _DailyTipSection extends StatelessWidget {
     );
   }
 }
+
+
 
 class _ChallengesSection extends StatefulWidget {
   const _ChallengesSection();
@@ -306,9 +320,12 @@ class ActivityCard extends StatelessWidget {
                        children: [
                          const Icon(Icons.location_on, color: Colors.blueAccent, size: 16),
                          const SizedBox(width: 4),
-                         Text(
-                           "Konum: ${activity.latitude!.toStringAsFixed(4)}, ${activity.longitude!.toStringAsFixed(4)}",
-                           style: const TextStyle(color: Colors.blueAccent, fontSize: 12, decoration: TextDecoration.underline),
+                         Flexible(
+                           child: Text(
+                             "Konum: ${activity.latitude!.toStringAsFixed(4)}, ${activity.longitude!.toStringAsFixed(4)}",
+                             style: const TextStyle(color: Colors.blueAccent, fontSize: 12, decoration: TextDecoration.underline),
+                             overflow: TextOverflow.ellipsis,
+                           ),
                          ),
                        ],
                      ),

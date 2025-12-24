@@ -1,7 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
-import '../models/models.dart';
-import 'gamification_service.dart'; // Import
+import '../models/activity_model.dart';
+import '../models/user_model.dart';
+import '../models/comment_model.dart';
+import '../models/like_model.dart';
+import '../models/activity_type_model.dart';
+import 'notification_service.dart';
+import 'gamification_service.dart';
+
+
 
 class ActivityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -26,19 +33,35 @@ class ActivityService {
     // Create Activity Object
     // Note: In a real app we'd upload photo to storage here and get URL
     
+    final activity = Activity(
+      id: activityId,
+      userId: userId,
+      typeId: typeId,
+      description: description,
+      photoId: photoUrl,
+      locationId: 'mock_location_id',
+      timestamp: DateTime.now(),
+      pointsEarned: pointsEarned,
+      amount: amount,
+      status: 'verified',
+      latitude: latitude,
+      longitude: longitude,
+    );
+    
+    // Use toMap from the model (Manual map removed)
     final activityData = {
-      'id': activityId,
-      'userId': userId,
-      'typeId': typeId,
-      'description': description,
-      'photoId': photoUrl,
-      'locationId': 'mock_location_id',
-      'timestamp': FieldValue.serverTimestamp(),
-      'pointsEarned': pointsEarned,
-      'amount': amount,
-      'status': 'verified', 
-      'latitude': latitude,
-      'longitude': longitude,
+        'id': activity.id,
+        'userId': activity.userId,
+        'typeId': activity.typeId,
+        'description': activity.description,
+        'photoId': activity.photoId,
+        'locationId': activity.locationId,
+        'timestamp': FieldValue.serverTimestamp(), // Override for server time
+        'pointsEarned': activity.pointsEarned,
+        'amount': activity.amount,
+        'status': activity.status,
+        'latitude': activity.latitude,
+        'longitude': activity.longitude,
     };
 
     try {
@@ -73,12 +96,25 @@ class ActivityService {
         transaction.update(userDoc, updateData);
       });
       
-      // Post-transaction: Check for new badges
-      // Fetch updated user points to be sure, or calculate locally.
-      DocumentSnapshot userSnap = await _usersRef.doc(userId).get();
-      if (userSnap.exists) {
-        int currentPoints = (userSnap.data() as Map<String, dynamic>)['totalPoints'] ?? 0;
-        await GamificationService().checkAndAssignBadges(userId, currentPoints);
+      // After transaction: Send notifications and check badges
+      try {
+        // Get updated user points
+        final userSnapshot = await _usersRef.doc(userId).get();
+        final userData = userSnapshot.data() as Map<String, dynamic>;
+        final totalPoints = userData['totalPoints'] ?? 0;
+
+        // Milestone notifications (100, 500, 1000, 5000)
+        final milestones = [100, 500, 1000, 5000];
+        for (var milestone in milestones) {
+          if (totalPoints >= milestone && (totalPoints - pointsEarned) < milestone) {
+            await NotificationService().sendMilestoneNotification(userId, milestone);
+          }
+        }
+
+        // Auto-check and award badges 🏆
+        await GamificationService().checkAndAwardBadges(userId, totalPoints);
+      } catch (e) {
+        print("Error sending notifications: $e");
       }
 
       print("Activity Added and Points Updated");
@@ -152,5 +188,31 @@ class ActivityService {
     // Note: Verify imports in file header.
     // Simple fire and forget or await.
     // We need to import it.
+  }
+
+  // Activity Types - Dynamic Fetching
+  Future<List<ActivityType>> getActivityTypes() async {
+    try {
+      final snapshot = await _firestore.collection('activity_types').get();
+      return snapshot.docs
+          .map((doc) => ActivityType.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      print("Error fetching activity types: $e");
+      return [];
+    }
+  }
+
+  Future<ActivityType?> getActivityTypeById(String id) async {
+    try {
+      final doc = await _firestore.collection('activity_types').doc(id).get();
+      if (doc.exists) {
+        return ActivityType.fromMap(doc.data()!);
+      }
+      return null;
+    } catch (e) {
+      print("Error fetching activity type: $e");
+      return null;
+    }
   }
 }

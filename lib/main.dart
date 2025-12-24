@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/map_state.dart';
+import 'services/database_seeder.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 
@@ -16,6 +17,9 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     isFirebaseInitialized = true;
+    
+    // Auto-seed database with initial data
+    await DatabaseSeeder().seed();
   } catch (e) {
     print("Firebase initialization failed/skipped: $e");
   }
@@ -53,10 +57,10 @@ class AuthWrapper extends StatelessWidget {
     
     // Simple state check. In a real app, might want a loading state while fetching user
     if (authService.isAuthenticated) {
-      return const HomeScreen(); 
+      return HomeScreen(); 
       // return const Scaffold(body: Center(child: Text("Home Screen Placeholder"))); 
     } else {
-      return const LoginScreen();
+      return LoginScreen();
     }
   }
 }

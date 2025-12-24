@@ -87,6 +87,7 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
        }
     }
 
+    if (!mounted) return;
     setState(() => _isUploading = true);
     
     try {
