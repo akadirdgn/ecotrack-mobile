@@ -382,12 +382,15 @@ class ActivityCard extends StatelessWidget {
 
 
   Widget _buildActivityImage(String photoData) {
+    if (photoData.isEmpty) return const SizedBox.shrink();
+
     // Check if it's a URL
-    if (photoData.startsWith('http')) {
+    if (photoData.startsWith('http') || photoData.startsWith('https')) {
       return Image.network(
         photoData,
         fit: BoxFit.cover,
         errorBuilder: (c, e, s) {
+           print("Error loading image from URL: $e");
            return _buildErrorPlaceholder();
         },
         loadingBuilder: (c, child, progress) {
@@ -396,13 +399,17 @@ class ActivityCard extends StatelessWidget {
         },
       );
     } 
-    // Assume Base64
+    // Assume Base64 or local path (if we supported it, but mainly URL now)
     try {
-      return Image.memory(
-        base64Decode(photoData),
-        fit: BoxFit.cover,
-        errorBuilder: (c, e, s) => _buildErrorPlaceholder(),
-      );
+      // If it's a very long string, it might be base64.
+      if (photoData.length > 200) {
+         return Image.memory(
+          base64Decode(photoData),
+          fit: BoxFit.cover,
+          errorBuilder: (c, e, s) => _buildErrorPlaceholder(),
+        );
+      }
+      return _buildErrorPlaceholder();
     } catch (e) {
       return _buildErrorPlaceholder(); 
     }

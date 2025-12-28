@@ -7,7 +7,9 @@ import '../../services/map_state.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/models.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/intl.dart';
 import '../../models/activity_model.dart'; // For filters or display
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -118,7 +120,7 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.ecotrack',
+                tileProvider: CancellableNetworkTileProvider(),
               ),
                
                // Real-time Activity stream

@@ -97,7 +97,6 @@ class AuthService extends ChangeNotifier {
         );
         await _firestore!.collection('users').doc(cred.user!.uid).set(newUser.toMap());
         
-        // Send Welcome Notification ONLY for new users 🎉
         if (isNewUser) {
           await NotificationService().sendWelcomeNotification(cred.user!.uid, displayName);
         }

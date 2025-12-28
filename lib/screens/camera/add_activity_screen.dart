@@ -114,17 +114,23 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
 
 
 
-      // 1. Image Strategy: Disabled (User Request)
-      // User wanted to disable image adding due to network errors.
-      // We still keep the camera flow but don't save the image URL for now.
-      String photoData = ""; 
+      // 1. Image Strategy: Upload to Storage
+      String photoData = "";
+      try {
+        if (mounted) setState(() => _isUploading = true);
+        final storageService = StorageService();
+        photoData = await storageService.uploadImage(File(widget.imagePath), user.uid);
+      } catch (e) {
+        print("Image upload failed: $e, continuing without image");
+        // Optional: Show error or continue. For now we continue.
+      }
 
 
       await activityService.addActivity(
         userId: user.uid,
         typeId: _selectedType!,
         description: _descriptionController.text,
-        photoUrl: photoData, 
+        photoUrl: photoData,
         pointsEarned: points,
         amount: amount,
         latitude: _currentPosition!.latitude,
@@ -152,19 +158,18 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Image Preview
-            // Image Preview (Removed as per request to simplify)
-            // Container(
-            //   height: 250,
-            //   decoration: BoxDecoration(
-            //     borderRadius: BorderRadius.circular(12),
-            //     image: DecorationImage(
-            //       image: FileImage(File(widget.imagePath)),
-            //       fit: BoxFit.cover,
-            //     ),
-            //   ),
-            // ),
-            const Center(child: Icon(Icons.check_circle, size: 64, color: Colors.green)),
-            const Center(child: Text("Fotoğraf Alındı", style: TextStyle(color: Colors.green))),
+            Container(
+              height: 250,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                image: DecorationImage(
+                  image: FileImage(File(widget.imagePath)),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Center(child: Text("Fotoğraf Alındı", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))),
             const SizedBox(height: 16),
             
             // Type Selector
