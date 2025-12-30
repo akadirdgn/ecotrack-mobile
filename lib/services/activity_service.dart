@@ -7,6 +7,7 @@ import '../models/like_model.dart';
 import '../models/activity_type_model.dart';
 import 'notification_service.dart';
 import 'gamification_service.dart';
+import 'streak_service.dart';
 
 
 
@@ -96,8 +97,11 @@ class ActivityService {
         transaction.update(userDoc, updateData);
       });
       
-      // After transaction: Send notifications and check badges
+      // After transaction: Update streak, send notifications, and check badges
       try {
+        // Update daily streak
+        await StreakService().updateStreak(userId);
+        
         // Get updated user points
         final userSnapshot = await _usersRef.doc(userId).get();
         final userData = userSnapshot.data() as Map<String, dynamic>;
@@ -158,6 +162,16 @@ class ActivityService {
       'text': text,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> deleteComment(String commentId) async {
+    try {
+      await _firestore.collection('comments').doc(commentId).delete();
+      print("Comment deleted: $commentId");
+    } catch (e) {
+      print("Error deleting comment: $e");
+      rethrow;
+    }
   }
 
   Stream<List<Comment>> getComments(String activityId) {

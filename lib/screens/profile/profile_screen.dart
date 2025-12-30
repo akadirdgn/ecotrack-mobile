@@ -29,7 +29,15 @@ class ProfileScreen extends StatelessWidget {
             expandedHeight: 200.0,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(user.displayName),
+              centerTitle: true,
+              titlePadding: const EdgeInsets.only(bottom: 16.0),
+              title: Text(
+                user.displayName,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(

@@ -15,6 +15,7 @@ import '../../models/comment_model.dart';
 import '../../models/challenge_model.dart';
 import '../../models/user_model.dart';
 import '../../models/tip_model.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class FeedScreen extends StatelessWidget {
   const FeedScreen({super.key});
@@ -28,7 +29,7 @@ class FeedScreen extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const ShimmerLoading();
         }
 
         if (snapshot.hasError) {
@@ -42,23 +43,28 @@ class FeedScreen extends StatelessWidget {
           return Activity.fromMap(data);
         }).toList();
 
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 80), 
-          itemCount: activities.length + 2, // Added +1 for Tip
-          itemBuilder: (context, index) {
-            // Index 0: Daily Tip (Static)
-            if (index == 0) {
-              return const _DailyTipSection();
-            }
-
-            // Index 1: Challenges
-            if (index == 1) {
-              return const _ChallengesSection();
-            }
-            
-            final activity = activities[index - 2];
-            return ActivityCard(activity: activity);
+        return RefreshIndicator(
+          onRefresh: () async {
+            // Trigger a rebuild by waiting briefly
+            await Future.delayed(const Duration(milliseconds: 500));
+            // Stream will automatically refresh
           },
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 80), 
+            itemCount: activities.length + 2,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return const _DailyTipSection();
+              }
+
+              if (index == 1) {
+                return const _ChallengesSection();
+              }
+              
+              final activity = activities[index - 2];
+              return ActivityCard(activity: activity);
+            },
+          ),
         );
       },
     );
@@ -533,6 +539,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                      itemCount: comments.length,
                      itemBuilder: (context, index) {
                        final comment = comments[index];
+                       final isOwnComment = comment.userId == user?.uid;
+                       
                        return ListTile(
                          leading: CircleAvatar(
                            backgroundColor: Colors.teal,
@@ -540,6 +548,35 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                          ),
                          title: Text(comment.userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                          subtitle: Text(comment.text, style: const TextStyle(color: Colors.white70)),
+                         trailing: isOwnComment
+                             ? IconButton(
+                                 icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                 onPressed: () async {
+                                   final confirm = await showDialog<bool>(
+                                     context: context,
+                                     builder: (ctx) => AlertDialog(
+                                       backgroundColor: Colors.grey[900],
+                                       title: const Text('Yorumu Sil', style: TextStyle(color: Colors.white)),
+                                       content: const Text('Bu yorumu silmek istediğinize emin misiniz?', style: TextStyle(color: Colors.white70)),
+                                       actions: [
+                                         TextButton(
+                                           onPressed: () => Navigator.of(ctx).pop(false),
+                                           child: const Text('İptal'),
+                                         ),
+                                         TextButton(
+                                           onPressed: () => Navigator.of(ctx).pop(true),
+                                           child: const Text('Sil', style: TextStyle(color: Colors.red)),
+                                         ),
+                                       ],
+                                     ),
+                                   );
+                                   
+                                   if (confirm == true) {
+                                     await _activityService.deleteComment(comment.id);
+                                   }
+                                 },
+                               )
+                             : null,
                        );
                      },
                    );
