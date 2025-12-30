@@ -32,6 +32,20 @@ class UserModel {
     'treesPlanted': treesPlanted,
     'co2Saved': co2Saved,
   };
+
+  factory UserModel.fromMap(Map<String, dynamic> map) {
+    return UserModel(
+      uid: map['uid'] ?? '',
+      email: map['email'] ?? '',
+      displayName: map['displayName'] ?? 'User',
+      avatarUrl: map['avatarUrl'],
+      totalPoints: map['totalPoints'] ?? 0,
+      activityCount: map['activityCount'] ?? 0,
+      plasticCollected: (map['plasticCollected'] as num?)?.toDouble() ?? 0.0,
+      treesPlanted: (map['treesPlanted'] as num?)?.toInt() ?? 0,
+      co2Saved: (map['co2Saved'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }
 
 class ImpactStat {

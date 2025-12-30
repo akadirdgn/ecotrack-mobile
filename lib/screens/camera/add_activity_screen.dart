@@ -114,7 +114,6 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
 
 
 
-      // 1. Image Strategy: Upload to Storage
       String photoData = "";
       try {
         if (mounted) setState(() => _isUploading = true);
@@ -122,7 +121,6 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
         photoData = await storageService.uploadImage(File(widget.imagePath), user.uid);
       } catch (e) {
         print("Image upload failed: $e, continuing without image");
-        // Optional: Show error or continue. For now we continue.
       }
 
 

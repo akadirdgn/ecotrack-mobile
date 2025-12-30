@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/group_model.dart';
 import '../models/notification_model.dart';
+import '../models/user_model.dart';
 // Note: Report and Badge models were removed as requested.
 
 class SocialService {
@@ -96,6 +97,34 @@ class SocialService {
   }
 
   // --- Reporting ---
+
+   Future<List<UserModel>> getGroupMembers(List<String> memberIds) async {
+    if (memberIds.isEmpty) return [];
+    try {
+      // API limit for 'whereIn' is 10. For larger groups, we'd need to chunk this or fetch individually.
+      // For this demo, we'll fetch individually to be safe or use whereIn if list is small.
+      if (memberIds.length > 10) {
+        // Simple fallback: fetch all users (not efficient for prod but ok for demo) or fetch one by one
+        final List<UserModel> members = [];
+        for (var id in memberIds) {
+          final doc = await _firestore.collection('users').doc(id).get();
+          if (doc.exists) {
+            members.add(UserModel.fromMap(doc.data()!));
+          }
+        }
+        return members;
+      } else {
+         final snapshot = await _firestore
+          .collection('users')
+          .where('uid', whereIn: memberIds)
+          .get();
+        return snapshot.docs.map((doc) => UserModel.fromMap(doc.data())).toList();
+      }
+    } catch (e) {
+      print("Error fetching group members: $e");
+      return [];
+    }
+  }
 
 
 }

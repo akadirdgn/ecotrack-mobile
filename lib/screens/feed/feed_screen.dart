@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
+import 'dart:io'; // Added for File
 import 'package:provider/provider.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
@@ -397,6 +398,13 @@ class ActivityCard extends StatelessWidget {
           if (progress == null) return child;
           return Center(child: CircularProgressIndicator(value: progress.expectedTotalBytes != null ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes! : null));
         },
+      );
+    } else if (File(photoData).existsSync()) {
+      // Local File support (Demo Mode)
+      return Image.file(
+        File(photoData),
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => _buildErrorPlaceholder(),
       );
     } 
     // Assume Base64 or local path (if we supported it, but mainly URL now)

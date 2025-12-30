@@ -8,6 +8,7 @@ import '../../models/badge_model.dart';
 import '../../models/group_model.dart';
 import '../../models/activity_model.dart';
 import 'settings_screen.dart';
+import 'group_detail_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -88,6 +89,16 @@ class ProfileScreen extends StatelessWidget {
                         }
 
                         final allBadges = snapshot.data!;
+                        
+                        // Sort badges: Earned first, then by points
+                        allBadges.sort((a, b) {
+                          final isEarnedA = user.totalPoints >= a.requiredPoints;
+                          final isEarnedB = user.totalPoints >= b.requiredPoints;
+                          
+                          if (isEarnedA && !isEarnedB) return -1;
+                          if (!isEarnedA && isEarnedB) return 1;
+                          return a.requiredPoints.compareTo(b.requiredPoints);
+                        });
 
                         if (allBadges.isEmpty) {
                           return Container(
@@ -150,26 +161,32 @@ class ProfileScreen extends StatelessWidget {
                           return Card(
                             color: Colors.white.withOpacity(0.05),
                             margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(backgroundColor: Colors.indigo, child: Text(group.name[0], style: const TextStyle(color: Colors.white))),
-                              title: Text(group.name, style: const TextStyle(color: Colors.white)),
-                              subtitle: Text("${group.totalPoints} Puan • ${group.memberIds.length} Üye", style: const TextStyle(color: Colors.white70)),
-                              trailing: isMember 
-                                ? const Icon(Icons.check_circle, color: Colors.green)
-                                : ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blueAccent,
-                                      foregroundColor: Colors.white,
-                                      minimumSize: const Size(60, 30),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => GroupDetailScreen(group: group)));
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: ListTile(
+                                leading: CircleAvatar(backgroundColor: Colors.indigo, child: Text(group.name[0], style: const TextStyle(color: Colors.white))),
+                                title: Text(group.name, style: const TextStyle(color: Colors.white)),
+                                subtitle: Text("${group.totalPoints} Puan • ${group.memberIds.length} Üye", style: const TextStyle(color: Colors.white70)),
+                                trailing: isMember 
+                                  ? const Icon(Icons.chevron_right, color: Colors.white54)
+                                  : ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blueAccent,
+                                        foregroundColor: Colors.white,
+                                        minimumSize: const Size(60, 30),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      ),
+                                      onPressed: () async {
+                                        await SocialService().joinGroup(group.id, user.uid);
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Gruba katıldınız!")));
+                                        (context as Element).markNeedsBuild(); // Force rebuild to update UI
+                                      }, 
+                                      child: const Text("Katıl", style: TextStyle(fontSize: 12)),
                                     ),
-                                    onPressed: () async {
-                                      await SocialService().joinGroup(group.id, user.uid);
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Gruba katıldınız!")));
-                                      (context as Element).markNeedsBuild(); // Force rebuild to update UI
-                                    }, 
-                                    child: const Text("Katıl", style: TextStyle(fontSize: 12)),
-                                  ),
+                              ),
                             ),
                           );
                         }).toList(),
