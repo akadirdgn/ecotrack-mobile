@@ -205,12 +205,17 @@ class ActivityService {
   }
 
   // Activity Types - Dynamic Fetching
+  static List<ActivityType>? _activityTypesCache;
+
   Future<List<ActivityType>> getActivityTypes() async {
+    if (_activityTypesCache != null) return _activityTypesCache!;
+    
     try {
       final snapshot = await _firestore.collection('activity_types').get();
-      return snapshot.docs
+      _activityTypesCache = snapshot.docs
           .map((doc) => ActivityType.fromMap(doc.data()))
           .toList();
+      return _activityTypesCache!;
     } catch (e) {
       print("Error fetching activity types: $e");
       return [];
@@ -227,6 +232,54 @@ class ActivityService {
     } catch (e) {
       print("Error fetching activity type: $e");
       return null;
+    }
+  }
+
+  // Deletion Logic
+  Future<void> deleteActivity(String activityId) async {
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final activityRef = _activitiesRef.doc(activityId);
+        final activitySnapshot = await transaction.get(activityRef);
+
+        if (!activitySnapshot.exists) {
+          throw Exception("Activity does not exist!");
+        }
+
+        final activityData = activitySnapshot.data() as Map<String, dynamic>;
+        final userId = activityData['userId'];
+        final pointsEarned = activityData['pointsEarned'] ?? 0;
+        final typeId = activityData['typeId'];
+        final amount = activityData['amount'] ?? 0.0;
+
+        // 1. Delete Activity
+        transaction.delete(activityRef);
+
+        // 2. Decrement User Stats
+        final userRef = _usersRef.doc(userId);
+        Map<String, dynamic> updateData = {
+          'totalPoints': FieldValue.increment(-pointsEarned),
+          'activityCount': FieldValue.increment(-1),
+        };
+
+        if (typeId == 'plastic') {
+           updateData['plasticCollected'] = FieldValue.increment(-amount); 
+           updateData['co2Saved'] = FieldValue.increment(-(amount * 2.0));
+        } else if (typeId == 'tree') {
+           updateData['treesPlanted'] = FieldValue.increment(-(amount.toInt()));
+           updateData['co2Saved'] = FieldValue.increment(-(amount * 10.0));
+        }
+        if (typeId == 'glass') {
+           updateData['co2Saved'] = FieldValue.increment(-(amount * 0.5));
+        }
+
+        transaction.update(userRef, updateData);
+      });
+      
+      print("Activity Deleted: $activityId");
+    } catch (e) {
+      print("Error deleting activity: $e");
+      rethrow;
     }
   }
 }

@@ -17,56 +17,165 @@ import '../../models/user_model.dart';
 import '../../models/tip_model.dart';
 import '../../widgets/shimmer_loading.dart';
 
-class FeedScreen extends StatelessWidget {
+class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
+  State<FeedScreen> createState() => _FeedScreenState();
+}
+
+class _FeedScreenState extends State<FeedScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final int _postsPerPage = 8;
+  
+  List<Activity> _activities = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  DocumentSnapshot? _lastDocument;
+  bool _hasMore = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchInitialPosts();
+  }
+
+  Future<void> _fetchInitialPosts() async {
+    setState(() {
+      _isLoading = true;
+      _activities = [];
+      _hasMore = true;
+    });
+
+    try {
+      QuerySnapshot querySnapshot = await _firestore
           .collection('activities')
           .orderBy('timestamp', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const ShimmerLoading();
-        }
+          .limit(_postsPerPage)
+          .get();
 
-        if (snapshot.hasError) {
-          return Center(child: Text("Hata: ${snapshot.error}"));
-        }
-
-        final docs = snapshot.data?.docs ?? [];
-        final activities = docs.map((doc) {
+      final docs = querySnapshot.docs;
+      
+      if (docs.isNotEmpty) {
+        _lastDocument = docs.last;
+        _activities = docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          data['id'] = doc.id; 
+          data['id'] = doc.id;
+          return Activity.fromMap(data);
+        }).toList();
+      }
+      
+      if (docs.length < _postsPerPage) {
+        _hasMore = false;
+      }
+
+    } catch (e) {
+      print("Error fetching posts: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMorePosts() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+
+    try {
+      QuerySnapshot querySnapshot = await _firestore
+          .collection('activities')
+          .orderBy('timestamp', descending: true)
+          .startAfterDocument(_lastDocument!)
+          .limit(_postsPerPage)
+          .get();
+
+      final docs = querySnapshot.docs;
+      
+      if (docs.isNotEmpty) {
+        _lastDocument = docs.last;
+        final newActivities = docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
           return Activity.fromMap(data);
         }).toList();
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            // Trigger a rebuild by waiting briefly
-            await Future.delayed(const Duration(milliseconds: 500));
-            // Stream will automatically refresh
-          },
-          child: ListView.builder(
-            padding: const EdgeInsets.only(bottom: 80), 
-            itemCount: activities.length + 2,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return const _DailyTipSection();
-              }
+        setState(() {
+          _activities.addAll(newActivities);
+        });
+      }
+      
+      if (docs.length < _postsPerPage) {
+        setState(() => _hasMore = false);
+      }
 
-              if (index == 1) {
-                return const _ChallengesSection();
-              }
-              
-              final activity = activities[index - 2];
-              return ActivityCard(activity: activity);
-            },
-          ),
-        );
-      },
+    } catch (e) {
+      print("Error loading more posts: $e");
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Daha fazla gönderi yüklenemedi.")));
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+      }
+    }
+  }
+
+  Future<void> _refresh() async {
+    await _fetchInitialPosts();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const ShimmerLoading();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 80), 
+        itemCount: _activities.length + 3, // Tip + Challenges + List + LoadMore
+        itemBuilder: (context, index) {
+          // 1. Daily Tip
+          if (index == 0) {
+            return const _DailyTipSection();
+          }
+
+          // 2. Challenges
+          if (index == 1) {
+            return const _ChallengesSection();
+          }
+          
+          // 3. Activity List
+          final activityIndex = index - 2;
+          if (activityIndex < _activities.length) {
+            final activity = _activities[activityIndex];
+            return ActivityCard(activity: activity);
+          }
+
+          // 4. Load More Button / Indicator
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(
+              child: _hasMore 
+                  ? _isLoadingMore 
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton(
+                          onPressed: _loadMorePosts,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white10,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          child: const Text("Daha Fazla Yükle"),
+                        )
+                  : const Text("Tüm gönderiler yüklendi 🎉", style: TextStyle(color: Colors.white54)),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -396,6 +505,7 @@ class ActivityCard extends StatelessWidget {
       return Image.network(
         photoData,
         fit: BoxFit.cover,
+        cacheWidth: 800, // Memory optimization
         errorBuilder: (c, e, s) {
            print("Error loading image from URL: $e");
            return _buildErrorPlaceholder();

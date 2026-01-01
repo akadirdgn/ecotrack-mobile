@@ -12,6 +12,7 @@ import '../../models/user_model.dart';
 import '../../models/activity_model.dart';
 import '../../models/notification_model.dart';
 import '../../models/challenge_model.dart';
+import '../admin/admin_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,8 +25,11 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    const FeedScreen(), // Feed
-    const MapScreen(), // Map
+    const FeedScreen(),
+    const MapScreen(), // Placeholder
+    const SizedBox(), // Camera Button Spacer
+    const SizedBox(), // Leaderboard Placeholder
+    const ProfileScreen(),
   ];
 
   void _onTabTapped(int index) {
@@ -44,7 +48,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final authService = Provider.of<AuthService>(context);
+    final isAdmin = authService.isAdmin;
     
     // Listen to MapState for navigation requests
     final mapState = Provider.of<MapState>(context);
@@ -62,6 +67,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         title: const Text("EcoTrack"),
         actions: [
+          // Admin Panel Button (only for admins)
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings, color: Colors.redAccent),
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+              },
+            ),
           // Notifications Icon
           Consumer<AuthService>(
             builder: (context, authService, _) {

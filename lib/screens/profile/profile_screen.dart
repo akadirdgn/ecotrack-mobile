@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart' hide Badge;
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../../services/social_service.dart';
 import '../../services/gamification_service.dart';
+import '../../services/activity_service.dart';
 import '../../models/user_model.dart';
 import '../../models/badge_model.dart';
 import '../../models/group_model.dart';
@@ -210,6 +212,129 @@ class ProfileScreen extends StatelessWidget {
                   _buildImpactTile(context, Icons.delete_outline, "Toplanan Plastik", "${user.plasticCollected} kg"),
                   _buildImpactTile(context, Icons.park, "Dikilen Ağaç", "${user.treesPlanted}"),
                   _buildImpactTile(context, Icons.co2, "Karbon Tasarrufu", "${user.co2Saved} kg"),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // My Posts Section
+                  Text("Gönderilerim", style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('activities')
+                        .where('userId', isEqualTo: user.uid)
+                        .orderBy('timestamp', descending: true)
+                        .limit(10)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              "Henüz gönderi yok. İlk gönderini eklemek için kamera butonuna bas!",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final activities = snapshot.data!.docs.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        data['id'] = doc.id;
+                        return Activity.fromMap(data);
+                      }).toList();
+
+                      return Column(
+                        children: activities.map((activity) {
+                          String typeName = "Aktivite";
+                          IconData typeIcon = Icons.eco;
+                          if (activity.typeId == 'plastic') {
+                            typeName = "Plastik";
+                            typeIcon = Icons.delete_outline;
+                          } else if (activity.typeId == 'tree') {
+                            typeName = "Ağaç";
+                            typeIcon = Icons.park;
+                          } else if (activity.typeId == 'glass') {
+                            typeName = "Cam";
+                            typeIcon = Icons.wine_bar;
+                          }
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            color: Colors.white.withOpacity(0.05),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.teal.withOpacity(0.3),
+                                child: Icon(typeIcon, color: Colors.teal),
+                              ),
+                              title: Text(
+                                activity.description.isEmpty ? typeName : activity.description,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              subtitle: Text(
+                                "${activity.amount} ${activity.typeId == 'tree' ? 'adet' : 'kg'} • ${activity.pointsEarned}P",
+                                style: const TextStyle(color: Colors.white54),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      backgroundColor: Colors.grey[900],
+                                      title: const Text('Gönderiyi Sil', style: TextStyle(color: Colors.white)),
+                                      content: const Text(
+                                        'Bu gönderiyi silmek istediğinize emin misiniz? Puanlarınız geri alınacaktır.',
+                                        style: TextStyle(color: Colors.white70),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                          child: const Text('İptal'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(true),
+                                          child: const Text('Sil', style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (confirm == true) {
+                                    try {
+                                      await ActivityService().deleteActivity(activity.id);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text("Gönderi silindi")),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text("Hata: $e")),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
                   
                   const SizedBox(height: 24),
                   

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserModel {
   final String uid;
   final String email;
@@ -8,6 +10,7 @@ class UserModel {
   final double plasticCollected;
   final int treesPlanted;
   final double co2Saved;
+  final DateTime createdAt;
 
   UserModel({
     required this.uid, 
@@ -19,7 +22,8 @@ class UserModel {
     this.plasticCollected = 0.0,
     this.treesPlanted = 0,
     this.co2Saved = 0.0,
-  });
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toMap() => {
     'uid': uid,
@@ -31,6 +35,7 @@ class UserModel {
     'plasticCollected': plasticCollected,
     'treesPlanted': treesPlanted,
     'co2Saved': co2Saved,
+    'createdAt': FieldValue.serverTimestamp(),
   };
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -44,6 +49,7 @@ class UserModel {
       plasticCollected: (map['plasticCollected'] as num?)?.toDouble() ?? 0.0,
       treesPlanted: (map['treesPlanted'] as num?)?.toInt() ?? 0,
       co2Saved: (map['co2Saved'] as num?)?.toDouble() ?? 0.0,
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 }

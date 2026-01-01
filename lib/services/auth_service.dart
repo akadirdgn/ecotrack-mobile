@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import '../models/admin_model.dart';
 import 'notification_service.dart';
 
 class AuthService extends ChangeNotifier {
@@ -11,6 +12,10 @@ class AuthService extends ChangeNotifier {
 
   UserModel? _user;
   UserModel? get user => _user;
+
+  AdminModel? _admin;
+  AdminModel? get admin => _admin;
+  bool get isAdmin => _admin != null;
 
   bool get isAuthenticated => _user != null; // Use _user instead of auth.currentUser for unified check
 
@@ -44,11 +49,33 @@ class AuthService extends ChangeNotifier {
               }
             }
           });
+
+          // Check if user is admin
+          _checkAdminStatus(firebaseUser.uid);
+
         } else {
           _user = null;
+          _admin = null;
           notifyListeners();
         }
       });
+    }
+  }
+
+  // Check 'admins' collection for the user
+  Future<void> _checkAdminStatus(String uid) async {
+    try {
+      final doc = await _firestore!.collection('admins').doc(uid).get();
+      if (doc.exists) {
+        _admin = AdminModel.fromMap(doc.data()!);
+        print("Admin Logged In: ${_admin!.email} (${_admin!.role})");
+      } else {
+        _admin = null;
+      }
+      notifyListeners();
+    } catch (e) {
+      print("Error checking admin status: $e");
+      _admin = null;
     }
   }
 
@@ -68,6 +95,7 @@ class AuthService extends ChangeNotifier {
 
     try {
       await _auth!.signInWithEmailAndPassword(email: email, password: password);
+      // Listener handles state update
       return null;
     } on FirebaseAuthException catch (e) {
       return _getTurkishError(e.code);
@@ -101,7 +129,7 @@ class AuthService extends ChangeNotifier {
           await NotificationService().sendWelcomeNotification(cred.user!.uid, displayName);
         }
         
-        await _fetchUserDetails(cred.user!.uid);
+        // Listener will check admin status automatically
       }
       return null;
     } on FirebaseAuthException catch (e) {
@@ -164,9 +192,12 @@ class AuthService extends ChangeNotifier {
   Future<void> signOut() async {
     if (_isMock) {
       _user = null;
+      _admin = null;
       notifyListeners();
       return;
     }
     await _auth!.signOut();
+    _admin = null;
+    notifyListeners();
   }
 }
