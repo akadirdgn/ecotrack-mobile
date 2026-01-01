@@ -8,6 +8,7 @@ erDiagram
     USERS ||--o{ COMMENTS : writes
     USERS }o--o{ GROUPS : "joins"
     USERS }o--o{ CHALLENGES : participates
+    USERS ||--o| ADMINS : "can_be"
     
     ACTIVITIES ||--o{ LIKES : receives
     ACTIVITIES ||--o{ COMMENTS : has
@@ -26,6 +27,12 @@ erDiagram
         int longestStreak
         timestamp lastActivityDate
         string[] groupIds
+    }
+    
+    ADMINS {
+        string uid PK
+        string role
+        timestamp createdAt
     }
     
     ACTIVITIES {
@@ -125,44 +132,50 @@ erDiagram
 - **Önemli:** Streak (ardışık gün) bilgileri de burada
 - **İlişkiler:** Tüm aktivitelerin, yorumların, beğenilerin sahibi
 
-### 2. ACTIVITIES (Aktiviteler)
+### 2. ADMINS (Yöneticiler)
+- **Amaç:** Admin yetkilerine sahip kullanıcıları tanımlar
+- **Özellik:** Rol bazlı yetkilendirme (role: "admin", "super_admin")
+- **İlişki:** Bir kullanıcı admin olabilir (opsiyonel)
+- **Kullanım:** Admin panelinde kullanıcı ve gönderi yönetimi
+
+### 3. ACTIVITIES (Aktiviteler)
 - **Amaç:** Kullanıcıların gerçekleştirdiği eko aktiviteleri
 - **Native Özellik:** GPS konumu (latitude/longitude) ve kamera (photoId)
 - **İlişkiler:** Bir kullanıcıya ve bir aktivite tipine ait
 
-### 3. ACTIVITY_TYPES (Aktivite Tipleri)
+### 4. ACTIVITY_TYPES (Aktivite Tipleri)
 - **Amaç:** Plastik toplama, ağaç dikimi, cam geri dönüşüm gibi tipler
 - **Özellik:** Her tip için puan hesaplama (pointsPerUnit)
 
-### 4. BADGES (Rozetler)
+### 5. BADGES (Rozetler)
 - **Amaç:** Başarı rozetleri tanımı
 - **Gamification:** Kullanıcı motivasyonu için
 
-### 5. USER_BADGES (Kullanıcı Rozetleri)
+### 6. USER_BADGES (Kullanıcı Rozetleri)
 - **Amaç:** Hangi kullanıcının hangi rozeti kazandığını takip
 - **İlişki Tablosu:** USERS ↔ BADGES many-to-many ilişkisi
 
-### 6. GROUPS (Topluluklar)
+### 7. GROUPS (Topluluklar)
 - **Amaç:** Kullanıcı grupları/topluluklar
 - **Özellik:** Grup toplam puanı ve üye listesi
 
-### 7. LIKES (Beğeniler)
+### 8. LIKES (Beğeniler)
 - **Amaç:** Aktivitelere yapılan beğeniler
 - **İlişki:** Bir kullanıcı bir aktiviteyi beğenir
 
-### 8. COMMENTS (Yorumlar)
+### 9. COMMENTS (Yorumlar)
 - **Amaç:** Aktivitelere yapılan yorumlar
 - **Özellik:** Kullanıcılar kendi yorumlarını silebilir
 
-### 9. CHALLENGES (Meydan Okumalar)
+### 10. CHALLENGES (Meydan Okumalar)
 - **Amaç:** Zaman sınırlı toplu görevler
 - **Özellik:** Başlangıç/bitiş tarihi ve katılımcılar
 
-### 10. TIPS (İpuçları)
+### 11. TIPS (İpuçları)
 - **Amaç:** Günlük çevre ipuçları
 - **Özellik:** Aktif/pasif durumu (isActive)
 
-### 11. NOTIFICATIONS (Bildirimler)
+### 12. NOTIFICATIONS (Bildirimler)
 - **Amaç:** Kullanıcı bildirimleri
 - **Özellik:** Okundu/okunmadı durumu
 
